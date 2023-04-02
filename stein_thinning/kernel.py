@@ -28,29 +28,32 @@ def make_precon(smp, scr, pre='id'):
 
     # Select preconditioner
     m = 1000
-    if pre == 'id':
-        linv = np.identity(dm)
-    elif pre == 'med':
-        m2 = med2(m)
-        if m2 == 0:
-            raise Exception('Too few unique samples in smp.')
-        linv = inv(m2 * np.identity(dm))
-    elif pre == 'sclmed':
-        m2 = med2(m)
-        if m2 == 0:
-            raise Exception('Too few unique samples in smp.')
-        linv = inv(m2 / np.log(np.minimum(m, sz)) * np.identity(dm))
-    elif pre == 'smpcov':
-        c = np.cov(smp, rowvar=False)
-        if not all(eig(c)[0] > 0):
-            raise Exception('Too few unique samples in smp.')
-        linv = inv(c)
+    if type(pre) == str:
+        if pre == 'id':
+            linv = np.identity(dm)
+        elif pre == 'med':
+            m2 = med2(m)
+            if m2 == 0:
+                raise Exception('Too few unique samples in smp.')
+            linv = inv(m2 * np.identity(dm))
+        elif pre == 'sclmed':
+            m2 = med2(m)
+            if m2 == 0:
+                raise Exception('Too few unique samples in smp.')
+            linv = inv(m2 / np.log(np.minimum(m, sz)) * np.identity(dm))
+        elif pre == 'smpcov':
+            c = np.cov(smp, rowvar=False)
+            if not all(eig(c)[0] > 0):
+                raise Exception('Too few unique samples in smp.')
+            linv = inv(c)
+        elif isfloat(pre):
+            linv = inv(float(pre) * np.identity(dm))
+        else:
+            raise ValueError('Incorrect preconditioner string.')
     elif type(pre) == np.ndarray and pre.shape == (dm, dm):
         if not all(eig(pre)[0] > 0):
             raise Exception('Preconditioner is not positive definite.')
         linv = inv(pre)
-    elif isfloat(pre):
-        linv = inv(float(pre) * np.identity(dm))
     else:
         raise ValueError('Incorrect preconditioner type.')
     return linv
