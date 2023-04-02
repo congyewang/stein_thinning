@@ -45,12 +45,12 @@ def make_precon(smp, scr, pre='id'):
         if not all(eig(c)[0] > 0):
             raise Exception('Too few unique samples in smp.')
         linv = inv(c)
-    elif isfloat(pre):
-        linv = inv(float(pre) * np.identity(dm))
     elif type(pre) == np.ndarray and pre.shape == (dm, dm):
         if not all(eig(pre)[0] > 0):
             raise Exception('Preconditioner is not positive definite.')
         linv = inv(pre)
+    elif isfloat(pre):
+        linv = inv(float(pre) * np.identity(dm))
     else:
         raise ValueError('Incorrect preconditioner type.')
     return linv
