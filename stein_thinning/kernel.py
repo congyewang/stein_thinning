@@ -53,7 +53,7 @@ def make_precon(smp, scr, pre='id'):
     elif type(pre) == np.ndarray and pre.shape == (dm, dm):
         if not all(eig(pre)[0] > 0):
             raise Exception('Preconditioner is not positive definite.')
-        linv = inv(pre)
+        linv = pre
     else:
         raise ValueError('Incorrect preconditioner type.')
     return linv
