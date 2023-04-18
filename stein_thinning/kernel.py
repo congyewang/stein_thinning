@@ -6,6 +6,10 @@ from numpy.linalg import eig
 from scipy.spatial.distance import pdist
 from stein_thinning.util import isfloat
 
+from jax import jit, jacfwd, vmap
+from jax import numpy as jnp
+
+
 def vfk0_imq(a, b, sa, sb, linv):
     amb = a.T - b.T
     qf = 1 + np.sum(np.dot(linv, amb) * amb, axis=0)
@@ -13,6 +17,20 @@ def vfk0_imq(a, b, sa, sb, linv):
     t2 = (np.trace(linv) + np.sum(np.dot(linv, sa.T - sb.T) * amb, axis=0)) / (qf ** 1.5)
     t3 = np.sum(sa.T * sb.T, axis=0) / (qf ** 0.5)
     return t1 + t2 + t3
+
+def vfk0_kgm(x, y, sx, sy, linv, s):
+    base_kernel = lambda x, y: (1 + x@linv@x)**((s-1)/2) *\
+        (1 + y@linv@y)**((s-1)/2) *\
+        (1 + (x-y)@linv@(x-y))**(-0.5) +\
+        (1 + x@linv@y )/( jnp.sqrt(1+x@linv@x) * jnp.sqrt(1+y@linv@y) )
+    dx_k = jit(jacfwd(base_kernel, argnums=0))
+    dy_k = jit(jacfwd(base_kernel, argnums=1))
+    dxdy_k = jit(jacfwd(dy_k, argnums=0))
+    kp = jit(lambda x, y, sx, sy: jnp.trace(dxdy_k(x, y))\
+                    + dx_k(x, y) @ sy\
+                    + dy_k(x, y) @ sx\
+                    + base_kernel(x, y) * sx @ sy)
+    return jit(vmap(kp))(x, y, sx, sy)
 
 def make_precon(smp, scr, pre='id'):
     # Sample size and dimension
@@ -62,4 +80,10 @@ def make_imq(smp, scr, pre='id'):
     linv = make_precon(smp, scr, pre)
     def vfk0(a, b, sa, sb):
         return vfk0_imq(a, b, sa, sb, linv)
+    return vfk0
+
+def make_kgm(smp, scr, pre='id', s=3):
+    linv = make_precon(smp, scr, pre)
+    def vfk0(a, b, sa, sb):
+        return vfk0_kgm(a, b, sa, sb, linv, s)
     return vfk0
