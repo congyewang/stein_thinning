@@ -141,6 +141,6 @@ def make_kgm(smp, scr, pre='id', s=3):
 
 def make_centkgm(smp, scr, x_map, pre='id', s=3):
     linv = make_precon(smp, scr, pre)
-    def vfk0(a, b, sa, sb, x_map):
+    def vfk0(a, b, sa, sb):
         return vfk0_centkgm(a, b, sa, sb, linv, s, x_map)
     return vfk0

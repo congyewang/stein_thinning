@@ -1,7 +1,7 @@
 import numpy as np
-from stein_thinning.kernel import make_imq
+from stein_thinning.kernel import make_imq, make_centkgm
 
-def thin(smp, scr, m, stnd=True, pre='id', verb=False):
+def thin(smp, scr, m, stnd=True, pre='id', verb=False, kern='imq', xmp=None, s=3):
     """
     Optimally select m points from n > m samples generated from a target
     distribution of d dimensions.
@@ -18,6 +18,9 @@ def thin(smp, scr, m, stnd=True, pre='id', verb=False):
            of an isotropic kernel.
     verb - optional logical, either 'True' or 'False' (default), indicating
            whether or not to be verbose about the thinning progress.
+    kern - optional string, either 'imq' or 'centkgm'.
+    xmp  - optional n x d array where kern is 'centkgm'.
+    s    - optional int where kern is 'centkgm'.
 
     Returns:
     array shaped (m,) containing the row indices in smp (and scr) of the
@@ -46,7 +49,11 @@ def thin(smp, scr, m, stnd=True, pre='id', verb=False):
         scr = scr * scl
 
     # Vectorised Stein kernel function
-    vfk0 = make_imq(smp, scr, pre)
+    if kern == 'imq':
+        vfk0 = make_imq(smp, scr, pre)
+    elif kern == 'centkgm':
+        if xmp is not None:
+            vfk0 = make_centkgm(smp, scr, xmp, pre, s)
 
     # Pre-allocate arrays
     k0 = np.empty((n, m))
