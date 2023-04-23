@@ -32,6 +32,57 @@ def vfk0_kgm(x, y, sx, sy, linv, s):
                     + base_kernel(x, y) * sx @ sy)
     return jit(vmap(kp))(x, y, sx, sy)
 
+def vfk0_centkgm(x, y, sx, sy, linv, s, x_map):
+    vkappa = np.diag((1 + (x-y)@linv@(x-y).T )**(-0.5) +\
+            (1 + (x-x_map)@linv@(y-x_map).T)/( (1+(x-x_map)@linv@(x-x_map).T)**(s/2) * (1+(y-x_map)@linv@(y-x_map).T)**(s/2) ))
+
+    vdxkappa = (linv @ (x-y).T * np.diag(-(1 + (x-y)@linv@(x-y).T )**(-1.5))) +\
+            (linv@(y-x_map).T - np.matmul(linv@(x-x_map).T, np.diag(np.diag(s*(1+(x-x_map)@linv@(y-x_map).T)*(1+(x-x_map)@linv@(x-x_map).T)**(-1)))))/(np.diag((1+(x-x_map)@linv@(x-x_map).T)**(s/2) * (1+(y-x_map)@linv@(y-x_map).T)**(s/2)))
+
+    vdykappa = (linv @ (x-y).T * np.diag((1 + (x-y)@linv@(x-y).T )**(-1.5))) +\
+            (linv@(x-x_map).T - np.matmul(linv@(y-x_map).T, np.diag(np.diag(s*(1+(x-x_map)@linv@(y-x_map).T)*(1+(y-x_map)@linv@(y-x_map).T)**(-1)))))/(np.diag((1+(x-x_map)@linv@(x-x_map).T)**(s/2) * (1+(y-x_map)@linv@(y-x_map).T)**(s/2)))
+
+    vdxdykappa = np.diag(-3*(1+(x-y)@linv@(x-y).T)**(-2.5)) * np.diag((x-y)@linv@linv@(x-y).T) + jnp.trace(linv)*np.diag((1+(x-y)@linv@(x-y).T)**(-1.5))\
+            + (
+                jnp.trace(linv)\
+                - s * np.diag((1 + (x-x_map)@linv@(x-x_map).T)**(-1)) * np.diag((x-x_map)@linv@linv@(x-x_map).T)\
+                - s * np.diag((1 + (y-x_map)@linv@(y-x_map).T)**(-1)) * np.diag((y-x_map)@linv@linv@(y-x_map).T)\
+                + s**2 * np.diag(1 + (x-x_map)@linv@(y-x_map).T) * np.diag((1 + (x-x_map)@linv@(x-x_map).T)**(-1)) * np.diag((1 + (y-x_map)@linv@(y-x_map).T)**(-1))\
+                * np.diag((x-x_map)@linv@linv@(y-x_map).T)
+                )\
+            / (np.diag((1 + (x-x_map)@linv@(x-x_map).T)**(s/2)) * np.diag((1 + (y-x_map)@linv@(y-x_map).T)**(s/2)))
+
+    vc = np.diag((1 + (x-x_map)@linv@(x-x_map).T)**((s-1)/2)\
+            * (1 + (y-x_map)@linv@(y-x_map).T)**((s-1)/2)\
+            * vkappa)
+
+    vdxc = np.diag((1 + (x-x_map)@linv@(x-x_map).T)**((s-1)/2))\
+            * np.diag((1 + (y-x_map)@linv@(y-x_map).T)**((s-1)/2))\
+            * (
+                ((s-1) * linv@(x-x_map).T * vkappa) / np.diag(1 + (x-x_map)@linv@(x-x_map).T)\
+                + vdxkappa
+            )
+
+    vdyc = np.diag((1 + (x-x_map)@linv@(x-x_map).T)**((s-1)/2))\
+            * np.diag(1 + (y-x_map)@linv@(y-x_map).T)**((s-1)/2)\
+            * (
+                ((s-1) * linv@(y-x_map).T) * vkappa / np.diag(1 + (y-x_map)@linv@(y-x_map).T)\
+                + vdykappa
+            )
+
+    vdxdyc = np.diag(np.diag((1+(x-x_map)@linv@(x-x_map).T)**((s-1)/2))\
+            * np.diag((1+(y-x_map)@linv@(y-x_map).T)**((s-1)/2))\
+            * (
+                (s-1)**2 * vkappa * np.diag((x-x_map)@linv@linv@(y-x_map).T / ((1+(x-x_map)@linv@(x-x_map).T)*(1+(y-x_map)@linv@(y-x_map).T)))\
+                + (s-1)*(y-x_map)@linv@vdxkappa / (1+(y-x_map)@linv@(y-x_map).T)\
+                + (s-1)*(x-x_map)@linv@vdykappa / (1+(x-x_map)@linv@(x-x_map).T)\
+                + vdxdykappa
+            ))
+
+    vkp = vdxdyc + np.diag(vdxc.T@sy.T) + np.diag(vdyc.T@sx.T) + vc * np.diag(sx@sy.T)
+
+    return vkp
+
 def make_precon(smp, scr, pre='id'):
     # Sample size and dimension
     sz, dm = smp.shape
@@ -86,4 +137,10 @@ def make_kgm(smp, scr, pre='id', s=3):
     linv = make_precon(smp, scr, pre)
     def vfk0(a, b, sa, sb):
         return vfk0_kgm(a, b, sa, sb, linv, s)
+    return vfk0
+
+def make_centkgm(smp, scr, x_map, pre='id', s=3):
+    linv = make_precon(smp, scr, pre)
+    def vfk0(a, b, sa, sb, x_map):
+        return vfk0_centkgm(a, b, sa, sb, linv, s, x_map)
     return vfk0
