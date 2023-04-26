@@ -67,7 +67,7 @@ def kmat(x, s, vfk0):
     k0 = np.zeros((n, n))
     for i in range(n):
         for j in range(i + 1):
-            k0[i, j] = vfk0(x[i], x[j], s[i], s[j])
+            k0[i, j] = vfk0(x[i].reshape(1, -1), x[j].reshape(1, -1), s[i].reshape(1, -1), s[j].reshape(1, -1))
     mirror_lower(k0)
     return k0
 
